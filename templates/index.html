@@ -1,1 +1,210 @@
-
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>SM2 + SM4 国密加密系统</title>
+    <style>
+        body {
+            font-family: Microsoft YaHei;
+            background: #f5f7fa;
+            padding: 30px;
+            max-width: 900px;
+            margin: auto;}
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);}
+        h1 {
+            text-align: center;
+            color: #2c3e50;}
+        h3 {
+            border-left: 5px solid #2196f3;
+            padding-left: 10px;}
+        input,
+        textarea,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;}
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            cursor: pointer;}
+        button:hover {
+            background: #1976d2;}
+        .result {
+            background: #f8f9fa;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            word-break: break-all;}
+    </style>
+</head>
+<body>
+    <h1>🔐 国密 SM2 + SM4 安全加密系统</h1>
+    <div class="card">
+        <h3>初始化密钥</h3>
+        <button onclick="initKeys()">初始化密钥</button>
+        <div class="result" id="initResult"></div>
+    </div>
+    <div class="card">
+        <h3>文本加密</h3>
+        <input id="keyIdEnc" placeholder="密钥ID">
+        <input id="encEncKey" placeholder="加密后的SM4 Key">
+        <textarea id="encText" rows="4" placeholder="输入明文"></textarea>
+        <button onclick="textEncrypt()">文本加密</button>
+        <div class="result" id="encResult"></div>
+    </div>
+    <div class="card">
+        <h3>文本解密</h3>
+        <input id="keyIdDec" placeholder="密钥ID">
+        <input id="decEncKey" placeholder="加密后的SM4 Key">
+        <textarea id="decText" rows="4" placeholder="输入密文"></textarea>
+        <button onclick="textDecrypt()">文本解密</button>
+        <div class="result" id="decResult"></div>
+    </div>
+    <div class="card">
+        <h3>文件加密</h3>
+        <input id="fKeyEnc" placeholder="密钥ID">
+        <input id="fEncKey" placeholder="加密后的SM4 Key">
+        <input type="file" id="fileEnc">
+        <button onclick="fileEncrypt()">文件加密</button>
+    </div>
+    <div class="card">
+        <h3>文件解密</h3>
+        <input id="fKeyDec" placeholder="密钥ID">
+        <input id="fDecKey" placeholder="加密后的SM4 Key">
+        <input type="file" id="fileDec">
+        <button onclick="fileDecrypt()">文件解密</button>
+    </div>
+    <script>
+        let keyId = "";
+        let encKey = "";
+        async function initKeys() {
+            const res = await fetch('/init_keys');
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                return;}
+            keyId = data.key_id;
+            encKey = data.encrypted_sm4_key;
+            document.getElementById("keyIdEnc").value = keyId;
+            document.getElementById("encEncKey").value = encKey;
+            document.getElementById("keyIdDec").value = keyId;
+            document.getElementById("decEncKey").value = encKey;
+            document.getElementById("fKeyEnc").value = keyId;
+            document.getElementById("fEncKey").value = encKey;
+            document.getElementById("fKeyDec").value = keyId;
+            document.getElementById("fDecKey").value = encKey;
+            document.getElementById("initResult").innerText =
+                "初始化成功";}
+        async function textEncrypt() {
+            const res = await fetch('/text_encrypt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    key_id: document.getElementById("keyIdEnc").value,
+                    encrypted_sm4_key: document.getElementById("encEncKey").value,
+                    text: document.getElementById("encText").value})});
+            const data = await res.json();
+            document.getElementById("encResult").innerText =
+                data.encrypted_text || data.error;}
+        async function textDecrypt() {
+            const res = await fetch('/text_decrypt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    key_id: document.getElementById("keyIdDec").value,
+                    encrypted_sm4_key: document.getElementById("decEncKey").value,
+                    encrypted_text: document.getElementById("decText").value})});
+            const data = await res.json();
+            document.getElementById("decResult").innerText =
+                data.decrypted_text || data.error;}
+        async function fileEncrypt() {
+            const file = document.getElementById("fileEnc").files[0];
+            if (!file) {
+                alert("请选择文件");
+                return;}
+            const fd = new FormData();
+            fd.append("key_id",
+                document.getElementById("fKeyEnc").value);
+            fd.append("encrypted_sm4_key",
+                document.getElementById("fEncKey").value);
+            fd.append("file", file);
+            const res = await fetch('/file_encrypt', {
+                method: 'POST',
+                body: fd});
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                return;}
+            const blob = new Blob([data.encrypted_data]);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.name + ".enc";
+            a.click();
+            URL.revokeObjectURL(url);}
+        async function fileDecrypt() {
+            const file = document.getElementById("fileDec").files[0];
+            if (!file) {
+                alert("请选择文件");
+                return;}
+            const fd = new FormData();
+            fd.append("key_id",
+                document.getElementById("fKeyDec").value);
+            fd.append("encrypted_sm4_key",
+                document.getElementById("fDecKey").value);
+            fd.append("file", file);
+            const res = await fetch('/file_decrypt', {
+                method: 'POST',
+                body: fd});
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error);
+                return;}
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.name.replace(".enc", "");
+            a.click();
+            URL.revokeObjectURL(url);}
+    async function pgpEncrypt() {
+            const file = document.getElementById("pgpFile").files[0];
+            const pgpKey = document.getElementById("pgpKey").value;
+            if (!file) {
+                alert("请选择文件");
+                return;}
+            if (!pgpKey) {
+                alert("请输入PGP公钥");
+                return;}
+            const fd = new FormData();
+            fd.append("file", file);
+            fd.append("pgp_public_key", pgpKey);
+            const res = await fetch('/pgp_encrypt', {method: 'POST',body: fd});
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error);
+                return;}
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.name + ".gpg";
+            a.click();
+            URL.revokeObjectURL(url);}
+    </script>
+    <div class="card">
+        <h3>PGP 文件加密</h3>
+        <textarea id="pgpKey" rows="8" placeholder="请输入PGP公钥"></textarea>
+        <input type="file" id="pgpFile">
+        <button onclick="pgpEncrypt()">PGP 文件加密</button>
+    </div>
+</body>
+</html>
